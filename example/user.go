@@ -4,9 +4,7 @@ package example
 
 // +golok:all
 type User struct {
-	Name  string
-	Email string
-	Age   int
+	Name  string `json:"name" validate:"required"`
+	Email string `json:"email" validate:"required"`
+	Age   int    `json:"age"`
 }
-
-

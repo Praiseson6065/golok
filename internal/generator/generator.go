@@ -2,7 +2,9 @@ package generator
 
 import (
 	"bytes"
+	"fmt"
 	"go/format"
+	"reflect"
 	"strings"
 	"text/template"
 	"unicode"
@@ -37,6 +39,31 @@ var funcMap = template.FuncMap{
 	// lbrace / rbrace avoid the {{{ template parsing ambiguity
 	"lbrace": func() string { return "{" },
 	"rbrace": func() string { return "}" },
+	// isRequired checks whether a field's struct tag contains validate:"required"
+	"isRequired": func(tag string) bool {
+		tagVal := reflect.StructTag(tag).Get("validate")
+		for _, rule := range strings.Split(tagVal, ",") {
+			if strings.TrimSpace(rule) == "required" {
+				return true
+			}
+		}
+		return false
+	},
+	// zeroCheck returns a Go expression that checks if a field is its zero value
+	"zeroCheck": func(fieldName, fieldType string) string {
+		switch {
+		case fieldType == "string":
+			return fmt.Sprintf(`s.%s == ""`, fieldName)
+		case strings.HasPrefix(fieldType, "*"):
+			return fmt.Sprintf(`s.%s == nil`, fieldName)
+		case strings.HasPrefix(fieldType, "[]"), strings.HasPrefix(fieldType, "map["):
+			return fmt.Sprintf(`s.%s == nil`, fieldName)
+		case fieldType == "bool":
+			return fmt.Sprintf(`!s.%s`, fieldName)
+		default: // numeric types: int, float64, etc.
+			return fmt.Sprintf(`s.%s == 0`, fieldName)
+		}
+	},
 }
 
 // Generate produces a complete, formatted Go source file with all requested methods.
@@ -86,10 +113,12 @@ func neededImports(structs []parser.StructInfo) []string {
 	for _, s := range structs {
 		for _, m := range s.Methods {
 			switch m {
-			case "stringer":
+			case "stringer", "validate":
 				needs["fmt"] = true
 			case "equals":
 				needs["reflect"] = true
+			case "json":
+				needs["encoding/json"] = true
 			}
 		}
 	}

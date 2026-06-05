@@ -8,9 +8,10 @@ import (
 )
 
 // allMethods is the full set of directives, used to expand "all".
+// Note: functional_options is excluded because it conflicts with constructor.
 var allMethods = []string{
 	"constructor", "getter", "setter", "builder",
-	"stringer", "equals", "clone",
+	"stringer", "equals", "clone", "json", "validate",
 }
 
 // StructInfo holds all data needed to generate methods for one struct.
@@ -25,6 +26,7 @@ type StructInfo struct {
 type FieldInfo struct {
 	Name string
 	Type string
+	Tag  string // raw struct tag, e.g. json:"name" validate:"required"
 }
 
 // ParseFile parses a .go file and returns all structs annotated with // +golok:...
@@ -72,10 +74,16 @@ func ParseFile(filename string) ([]StructInfo, string, error) {
 				if hasSkipDirective(field) {
 					continue // field marked with +golok:skip
 				}
+				// Extract struct tag if present (strip backticks)
+				var tag string
+				if field.Tag != nil {
+					tag = strings.Trim(field.Tag.Value, "`")
+				}
 				for _, name := range field.Names {
 					info.Fields = append(info.Fields, FieldInfo{
 						Name: name.Name,
 						Type: exprToString(field.Type),
+						Tag:  tag,
 					})
 				}
 			}

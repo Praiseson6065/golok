@@ -4,13 +4,16 @@ package generator
 // Templates receive a parser.StructInfo as data.
 // Available funcs: title (capitalize first char), lower (lowercase first char)
 var methodTemplates = map[string]string{
-	"getter":      getterTemplate,
-	"setter":      setterTemplate,
-	"constructor": constructorTemplate,
-	"builder":     builderTemplate,
-	"stringer":    stringerTemplate,
-	"equals":      equalsTemplate,
-	"clone":       cloneTemplate,
+	"getter":             getterTemplate,
+	"setter":             setterTemplate,
+	"constructor":        constructorTemplate,
+	"builder":            builderTemplate,
+	"stringer":           stringerTemplate,
+	"equals":             equalsTemplate,
+	"clone":              cloneTemplate,
+	"functional_options": functionalOptionsTemplate,
+	"json":               jsonTemplate,
+	"validate":           validateTemplate,
 }
 
 // getter generates a Get<Field>() method for every field.
@@ -93,5 +96,64 @@ const cloneTemplate = `
 func (s *{{.Name}}) Clone() *{{.Name}} {
 	c := *s
 	return &c
+}
+`
+
+// functional_options generates the functional options pattern:
+// - A {{.Name}}Option type
+// - With{{Field}}(v) option functions for each field
+// - New{{.Name}}(opts ...{{.Name}}Option) constructor
+// Note: conflicts with "constructor" — use one or the other.
+const functionalOptionsTemplate = `
+// {{.Name}}Option configures a {{.Name}} instance.
+type {{.Name}}Option func(*{{.Name}})
+
+{{range .Fields -}}
+// With{{title .Name}} sets the {{.Name}} field.
+func With{{title .Name}}(v {{.Type}}) {{$.Name}}Option {
+	return func(s *{{$.Name}}) {
+		s.{{.Name}} = v
+	}
+}
+{{end}}
+// New{{.Name}} creates a {{.Name}} with the given options applied.
+func New{{.Name}}(opts ...{{.Name}}Option) *{{.Name}} {
+	s := &{{.Name}}{}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+`
+
+// json generates ToJSON() and FromJSON() helper methods.
+const jsonTemplate = `
+// ToJSON serializes {{.Name}} to JSON bytes.
+func (s *{{.Name}}) ToJSON() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+// {{.Name}}FromJSON deserializes JSON bytes into a {{.Name}}.
+func {{.Name}}FromJSON(data []byte) (*{{.Name}}, error) {
+	var s {{.Name}}
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+`
+
+// validate generates a Validate() method that checks fields tagged with validate:"required".
+const validateTemplate = `
+// Validate checks required fields and returns an error if any are missing.
+func (s *{{.Name}}) Validate() error {
+	{{- range .Fields}}
+	{{- if isRequired .Tag}}
+	if {{zeroCheck .Name .Type}} {
+		return fmt.Errorf("{{$.Name}}.{{.Name}} is required")
+	}
+	{{- end}}
+	{{- end}}
+	return nil
 }
 `

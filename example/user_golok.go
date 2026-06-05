@@ -3,6 +3,7 @@
 package example
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 )
@@ -88,4 +89,29 @@ func (s *User) Equal(other *User) bool {
 func (s *User) Clone() *User {
 	c := *s
 	return &c
+}
+
+// ToJSON serializes User to JSON bytes.
+func (s *User) ToJSON() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+// UserFromJSON deserializes JSON bytes into a User.
+func UserFromJSON(data []byte) (*User, error) {
+	var s User
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// Validate checks required fields and returns an error if any are missing.
+func (s *User) Validate() error {
+	if s.Name == "" {
+		return fmt.Errorf("User.Name is required")
+	}
+	if s.Email == "" {
+		return fmt.Errorf("User.Email is required")
+	}
+	return nil
 }
