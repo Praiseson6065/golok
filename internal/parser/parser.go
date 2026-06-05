@@ -9,6 +9,7 @@ import (
 
 // allMethods is the full set of directives, used to expand "all".
 // Note: functional_options is excluded because it conflicts with constructor.
+// Note: interface and mapper are opt-in only.
 var allMethods = []string{
 	"constructor", "getter", "setter", "builder",
 	"stringer", "equals", "clone", "json", "validate",
@@ -16,10 +17,11 @@ var allMethods = []string{
 
 // StructInfo holds all data needed to generate methods for one struct.
 type StructInfo struct {
-	Name    string
-	Package string
-	Fields  []FieldInfo
-	Methods []string // e.g. ["getter", "setter", "builder"]
+	Name          string
+	Package       string
+	Fields        []FieldInfo
+	Methods       []string // e.g. ["getter", "setter", "builder"]
+	MapperTargets []string // e.g. ["UserDTO"] from mapper=UserDTO
 }
 
 // FieldInfo represents a single struct field.
@@ -29,16 +31,19 @@ type FieldInfo struct {
 	Tag  string // raw struct tag, e.g. json:"name" validate:"required"
 }
 
-// ParseFile parses a .go file and returns all structs annotated with // +golok:...
-func ParseFile(filename string) ([]StructInfo, string, error) {
+// ParseFile parses a .go file and returns:
+//   - annotated: structs with // +golok:... directives (for code generation)
+//   - allStructs: every struct in the file by name (for mapper target resolution)
+//   - pkg: the package name
+func ParseFile(filename string) (annotated []StructInfo, allStructs map[string]StructInfo, pkg string, err error) {
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, filename, nil, parser.ParseComments)
-	if err != nil {
-		return nil, "", err
+	f, parseErr := parser.ParseFile(fset, filename, nil, parser.ParseComments)
+	if parseErr != nil {
+		return nil, nil, "", parseErr
 	}
 
-	pkg := f.Name.Name
-	var structs []StructInfo
+	pkg = f.Name.Name
+	allStructs = make(map[string]StructInfo)
 
 	for _, decl := range f.Decls {
 		genDecl, ok := decl.(*ast.GenDecl)
@@ -46,10 +51,7 @@ func ParseFile(filename string) ([]StructInfo, string, error) {
 			continue
 		}
 
-		methods := parseDirective(genDecl.Doc)
-		if len(methods) == 0 {
-			continue // no golok directive, skip
-		}
+		methods, mapperTargets := parseDirective(genDecl.Doc)
 
 		for _, spec := range genDecl.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
@@ -62,9 +64,10 @@ func ParseFile(filename string) ([]StructInfo, string, error) {
 			}
 
 			info := StructInfo{
-				Name:    typeSpec.Name.Name,
-				Package: pkg,
-				Methods: methods,
+				Name:          typeSpec.Name.Name,
+				Package:       pkg,
+				Methods:       methods,
+				MapperTargets: mapperTargets,
 			}
 
 			for _, field := range structType.Fields.List {
@@ -88,19 +91,25 @@ func ParseFile(filename string) ([]StructInfo, string, error) {
 				}
 			}
 
-			structs = append(structs, info)
+			// Always add to allStructs for mapper lookups
+			allStructs[info.Name] = info
+
+			// Only add to annotated if it has directives
+			if len(methods) > 0 || len(mapperTargets) > 0 {
+				annotated = append(annotated, info)
+			}
 		}
 	}
 
-	return structs, pkg, nil
+	return annotated, allStructs, pkg, nil
 }
 
-// parseDirective extracts method names from a comment like:
+// parseDirective extracts method names and mapper targets from a comment like:
 //
-//	// +golok:getter,setter,builder
-func parseDirective(doc *ast.CommentGroup) []string {
+//	// +golok:getter,setter,mapper=UserDTO
+func parseDirective(doc *ast.CommentGroup) (methods []string, mapperTargets []string) {
 	if doc == nil {
-		return nil
+		return nil, nil
 	}
 	const prefix = "// +golok:"
 	for _, c := range doc.List {
@@ -109,21 +118,30 @@ func parseDirective(doc *ast.CommentGroup) []string {
 			continue
 		}
 		raw := strings.TrimPrefix(text, prefix)
-		var methods []string
 		for _, p := range strings.Split(raw, ",") {
-			if p = strings.TrimSpace(p); p != "" {
-				methods = append(methods, p)
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
 			}
+			// Handle mapper=Target directives
+			if strings.HasPrefix(p, "mapper=") {
+				target := strings.TrimPrefix(p, "mapper=")
+				if target != "" {
+					mapperTargets = append(mapperTargets, target)
+				}
+				continue
+			}
+			methods = append(methods, p)
 		}
 		// Expand "all" shorthand to every known directive
 		for _, m := range methods {
 			if m == "all" {
-				return allMethods
+				return allMethods, mapperTargets
 			}
 		}
-		return methods
+		return methods, mapperTargets
 	}
-	return nil
+	return nil, nil
 }
 
 // exprToString converts an AST type expression to its string representation.

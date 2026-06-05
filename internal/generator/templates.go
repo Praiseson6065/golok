@@ -14,6 +14,7 @@ var methodTemplates = map[string]string{
 	"functional_options": functionalOptionsTemplate,
 	"json":               jsonTemplate,
 	"validate":           validateTemplate,
+	"interface":          interfaceTemplate,
 }
 
 // getter generates a Get<Field>() method for every field.
@@ -155,5 +156,64 @@ func (s *{{.Name}}) Validate() error {
 	{{- end}}
 	{{- end}}
 	return nil
+}
+`
+
+// interface generates an interface type containing method signatures
+// for all other directives specified on the same struct.
+const interfaceTemplate = `
+// {{.Name}}Interface defines the generated contract for {{.Name}}.
+type {{.Name}}Interface interface {
+{{- range $_, $m := .Methods}}
+{{- if eq $m "getter"}}
+{{- range $.Fields}}
+	Get{{title .Name}}() {{.Type}}
+{{- end}}
+{{- end}}
+{{- if eq $m "setter"}}
+{{- range $.Fields}}
+	Set{{title .Name}}(v {{.Type}}) *{{$.Name}}
+{{- end}}
+{{- end}}
+{{- if eq $m "stringer"}}
+	String() string
+{{- end}}
+{{- if eq $m "equals"}}
+	Equal(other *{{$.Name}}) bool
+{{- end}}
+{{- if eq $m "clone"}}
+	Clone() *{{$.Name}}
+{{- end}}
+{{- if eq $m "json"}}
+	ToJSON() ([]byte, error)
+{{- end}}
+{{- if eq $m "validate"}}
+	Validate() error
+{{- end}}
+{{- end}}
+}
+`
+
+// mapper generates To{{Target}}/From{{Target}} conversion methods.
+// Used via MapperData (not StructInfo), rendered by the generator's mapper loop.
+const mapperTemplate = `
+// To{{.Target.Name}} converts {{.Source.Name}} to {{.Target.Name}},
+// copying fields that share the same name and type.
+func (s *{{.Source.Name}}) To{{.Target.Name}}() *{{.Target.Name}} {
+	return &{{.Target.Name}}{
+		{{- range .CommonFields}}
+		{{.Name}}: s.{{.Name}},
+		{{- end}}
+	}
+}
+
+// {{.Source.Name}}From{{.Target.Name}} converts a {{.Target.Name}} to {{.Source.Name}},
+// copying fields that share the same name and type.
+func {{.Source.Name}}From{{.Target.Name}}(src *{{.Target.Name}}) *{{.Source.Name}} {
+	return &{{.Source.Name}}{
+		{{- range .CommonFields}}
+		{{.Name}}: src.{{.Name}},
+		{{- end}}
+	}
 }
 `
