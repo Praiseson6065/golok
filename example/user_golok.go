@@ -42,6 +42,35 @@ func (s *User) SetAge(v int) *User {
 	return s
 }
 
+// UserBuilder builds a User using a fluent API.
+type UserBuilder struct {
+	obj User
+}
+
+// NewUserBuilder returns a new, zero-value builder.
+func NewUserBuilder() *UserBuilder {
+	return &UserBuilder{}
+}
+
+func (b *UserBuilder) Name(v string) *UserBuilder {
+	b.obj.Name = v
+	return b
+}
+func (b *UserBuilder) Email(v string) *UserBuilder {
+	b.obj.Email = v
+	return b
+}
+func (b *UserBuilder) Age(v int) *UserBuilder {
+	b.obj.Age = v
+	return b
+}
+
+// Build returns a pointer to the constructed User.
+func (b *UserBuilder) Build() *User {
+	c := b.obj
+	return &c
+}
+
 func (s *User) String() string {
 	return fmt.Sprintf("User{Name=%v, Email=%v, Age=%v}",
 		s.Name, s.Email, s.Age)
@@ -59,51 +88,4 @@ func (s *User) Equal(other *User) bool {
 func (s *User) Clone() *User {
 	c := *s
 	return &c
-}
-
-func NewProduct(iD int, title string, price float64, tags []string) *Product {
-	return &Product{
-		ID:    iD,
-		Title: title,
-		Price: price,
-		Tags:  tags,
-	}
-}
-
-// ProductBuilder builds a Product using a fluent API.
-type ProductBuilder struct {
-	obj Product
-}
-
-// NewProductBuilder returns a new, zero-value builder.
-func NewProductBuilder() *ProductBuilder {
-	return &ProductBuilder{}
-}
-
-func (b *ProductBuilder) ID(v int) *ProductBuilder {
-	b.obj.ID = v
-	return b
-}
-func (b *ProductBuilder) Title(v string) *ProductBuilder {
-	b.obj.Title = v
-	return b
-}
-func (b *ProductBuilder) Price(v float64) *ProductBuilder {
-	b.obj.Price = v
-	return b
-}
-func (b *ProductBuilder) Tags(v []string) *ProductBuilder {
-	b.obj.Tags = v
-	return b
-}
-
-// Build returns a pointer to the constructed Product.
-func (b *ProductBuilder) Build() *Product {
-	c := b.obj
-	return &c
-}
-
-func (s *Product) String() string {
-	return fmt.Sprintf("Product{ID=%v, Title=%v, Price=%v, Tags=%v}",
-		s.ID, s.Title, s.Price, s.Tags)
 }

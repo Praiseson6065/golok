@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+// allMethods is the full set of directives, used to expand "all".
+var allMethods = []string{
+	"constructor", "getter", "setter", "builder",
+	"stringer", "equals", "clone",
+}
+
 // StructInfo holds all data needed to generate methods for one struct.
 type StructInfo struct {
 	Name    string
@@ -63,6 +69,9 @@ func ParseFile(filename string) ([]StructInfo, string, error) {
 				if len(field.Names) == 0 {
 					continue // skip embedded fields
 				}
+				if hasSkipDirective(field) {
+					continue // field marked with +golok:skip
+				}
 				for _, name := range field.Names {
 					info.Fields = append(info.Fields, FieldInfo{
 						Name: name.Name,
@@ -98,6 +107,12 @@ func parseDirective(doc *ast.CommentGroup) []string {
 				methods = append(methods, p)
 			}
 		}
+		// Expand "all" shorthand to every known directive
+		for _, m := range methods {
+			if m == "all" {
+				return allMethods
+			}
+		}
 		return methods
 	}
 	return nil
@@ -126,4 +141,20 @@ func exprToString(expr ast.Expr) string {
 	default:
 		return "any"
 	}
+}
+
+// hasSkipDirective checks whether a struct field has a // +golok:skip annotation
+// in either its doc comment (above) or inline comment (trailing).
+func hasSkipDirective(field *ast.Field) bool {
+	for _, group := range []*ast.CommentGroup{field.Doc, field.Comment} {
+		if group == nil {
+			continue
+		}
+		for _, c := range group.List {
+			if strings.Contains(c.Text, "+golok:skip") {
+				return true
+			}
+		}
+	}
+	return false
 }

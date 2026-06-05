@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"go/format"
+	"strings"
 	"text/template"
 	"unicode"
 
@@ -19,10 +20,15 @@ var funcMap = template.FuncMap{
 		r[0] = unicode.ToUpper(r[0])
 		return string(r)
 	},
-	// lower lowercases the first rune: "Name" → "name", "ID" → "iD"
+	// lower lowercases for use as parameter names:
+	//   "Name" → "name", "ID" → "id", "URL" → "url"
+	// If the entire string is uppercase, lowercase all of it.
 	"lower": func(s string) string {
 		if s == "" {
 			return ""
+		}
+		if strings.ToUpper(s) == s {
+			return strings.ToLower(s)
 		}
 		r := []rune(s)
 		r[0] = unicode.ToLower(r[0])
