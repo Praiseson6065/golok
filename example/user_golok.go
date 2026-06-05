@@ -3,8 +3,18 @@
 package example
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 )
+
+func NewUser(name string, email string, age int) *User {
+	return &User{
+		Name:  name,
+		Email: email,
+		Age:   age,
+	}
+}
 
 func (s *User) GetName() string {
 	return s.Name
@@ -18,9 +28,92 @@ func (s *User) GetAge() int {
 	return s.Age
 }
 
+func (s *User) SetName(v string) *User {
+	s.Name = v
+	return s
+}
+
+func (s *User) SetEmail(v string) *User {
+	s.Email = v
+	return s
+}
+
+func (s *User) SetAge(v int) *User {
+	s.Age = v
+	return s
+}
+
+// UserBuilder builds a User using a fluent API.
+type UserBuilder struct {
+	obj User
+}
+
+// NewUserBuilder returns a new, zero-value builder.
+func NewUserBuilder() *UserBuilder {
+	return &UserBuilder{}
+}
+
+func (b *UserBuilder) Name(v string) *UserBuilder {
+	b.obj.Name = v
+	return b
+}
+func (b *UserBuilder) Email(v string) *UserBuilder {
+	b.obj.Email = v
+	return b
+}
+func (b *UserBuilder) Age(v int) *UserBuilder {
+	b.obj.Age = v
+	return b
+}
+
+// Build returns a pointer to the constructed User.
+func (b *UserBuilder) Build() *User {
+	c := b.obj
+	return &c
+}
+
 func (s *User) String() string {
 	return fmt.Sprintf("User{Name=%v, Email=%v, Age=%v}",
 		s.Name, s.Email, s.Age)
+}
+
+func (s *User) Equal(other *User) bool {
+	if other == nil {
+		return false
+	}
+	return reflect.DeepEqual(*s, *other)
+}
+
+// Clone returns a shallow copy of User.
+// For deep copies of slice/map fields, copy them manually.
+func (s *User) Clone() *User {
+	c := *s
+	return &c
+}
+
+// ToJSON serializes User to JSON bytes.
+func (s *User) ToJSON() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+// UserFromJSON deserializes JSON bytes into a User.
+func UserFromJSON(data []byte) (*User, error) {
+	var s User
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, err
+	}
+	return &s, nil
+}
+
+// Validate checks required fields and returns an error if any are missing.
+func (s *User) Validate() error {
+	if s.Name == "" {
+		return fmt.Errorf("User.Name is required")
+	}
+	if s.Email == "" {
+		return fmt.Errorf("User.Email is required")
+	}
+	return nil
 }
 
 // UserInterface defines the generated contract for User.
@@ -28,7 +121,14 @@ type UserInterface interface {
 	GetName() string
 	GetEmail() string
 	GetAge() int
+	SetName(v string) *User
+	SetEmail(v string) *User
+	SetAge(v int) *User
 	String() string
+	Equal(other *User) bool
+	Clone() *User
+	ToJSON() ([]byte, error)
+	Validate() error
 }
 
 // ToUserDTO converts User to UserDTO,

@@ -133,11 +133,28 @@ func parseDirective(doc *ast.CommentGroup) (methods []string, mapperTargets []st
 			}
 			methods = append(methods, p)
 		}
-		// Expand "all" shorthand to every known directive
+		// Expand "all" shorthand — merge with any other explicit directives
+		hasAll := false
 		for _, m := range methods {
 			if m == "all" {
-				return allMethods, mapperTargets
+				hasAll = true
+				break
 			}
+		}
+		if hasAll {
+			// Start with allMethods, then add any extras (e.g. interface)
+			seen := make(map[string]bool, len(allMethods))
+			expanded := make([]string, 0, len(allMethods)+len(methods))
+			for _, m := range allMethods {
+				seen[m] = true
+				expanded = append(expanded, m)
+			}
+			for _, m := range methods {
+				if m != "all" && !seen[m] {
+					expanded = append(expanded, m)
+				}
+			}
+			return expanded, mapperTargets
 		}
 		return methods, mapperTargets
 	}

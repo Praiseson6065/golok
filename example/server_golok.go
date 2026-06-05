@@ -43,3 +43,11 @@ func (s *Server) String() string {
 	return fmt.Sprintf("Server{Host=%v, Port=%v, TLS=%v}",
 		s.Host, s.Port, s.TLS)
 }
+
+// Validate checks required fields and returns an error if any are missing.
+func (s *Server) Validate() error {
+	if s.Host == "" {
+		return fmt.Errorf("Server.Host is required")
+	}
+	return nil
+}
