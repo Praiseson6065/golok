@@ -1,0 +1,10 @@
+# Binaries
+golok
+*.exe
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
